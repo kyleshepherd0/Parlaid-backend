@@ -1,23 +1,22 @@
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
-from sql.config import load_config
-
+from sql.config import load_config  # Ensure this import is correct
 
 def fixed_data(winner, location, loser, pts_win, pts_lose):
     if location == '@':
         home_team = loser
         away_team = winner
-        home_points = pts_lose
-        away_points = pts_win
+        home_points = int(pts_lose)
+        away_points = int(pts_win)
     else:
         home_team = winner
         away_team = loser
-        home_points = pts_win
-        away_points = pts_lose
+        home_points = int(pts_win)
+        away_points = int(pts_lose)
 
-    margin = int(home_points) - int(away_points)
-    total = int(home_points) + int(away_points)
+    margin = home_points - away_points
+    total = home_points + away_points
     
     return home_team, away_team, home_points, away_points, margin, total
 
@@ -43,27 +42,35 @@ def scrape_pfr(config):
                     pts_win_cell = row.find('td', {'data-stat': 'pts_win'})
                     pts_lose_cell = row.find('td', {'data-stat': 'pts_lose'})
                     
-                    if week_cell and winner_cell and location_cell and loser_cell and pts_win_cell and pts_lose_cell:
-                        week = week_cell.text
-                        winner = winner_cell.text
-                        location = location_cell.text.strip()
-                        loser = loser_cell.text
-                        pts_win = pts_win_cell.text
-                        pts_lose = pts_lose_cell.text  
+                    if not all([week_cell, winner_cell, loser_cell, pts_win_cell, pts_lose_cell]):
+                        raise ValueError(f"Missing critical data in row: {row}")
+                    
+                    week = week_cell.text.strip()
+                    winner = winner_cell.text.strip()
+                    location = location_cell.text.strip() if location_cell else ""
+                    loser = loser_cell.text.strip()
+                    pts_win = pts_win_cell.text.strip()
+                    pts_lose = pts_lose_cell.text.strip()
 
+                    if not all([week, winner, loser, pts_win, pts_lose]):
+                        raise ValueError(f"Empty data found in row: {row}")
+                    
+                    try:
                         home_team, away_team, home_points, away_points, margin, total = fixed_data(winner, location, loser, pts_win, pts_lose)
-
-                        cur.execute("""
-                            INSERT INTO nfl_schedule(year, week, home_team, away_team, home_points, away_points, margin, total)
-                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        """, (year, week, home_team, away_team, home_points, away_points, margin, total))
-                    else:
-                        print(f"Missing data in row: {row}")
+                    except ValueError as ve:
+                        raise ValueError(f"Error converting points to int in row: {row} - {ve}")
+                    
+                    cur.execute("""
+                        INSERT INTO nfl_schedule(year, week, home_team, away_team, home_points, away_points, margin, total)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (year, week, home_team, away_team, home_points, away_points, margin, total))
             year += 1
         print("Data scraping and insertion completed successfully.")
     except Exception as e:
         print(f"An Exception occurred: {e}")
+        raise
 
 if __name__ == '__main__':
-    config = load_config()
+    # Provide the relative path to the database.ini file
+    config = load_config('../sql/database.ini')
     scrape_pfr(config)
