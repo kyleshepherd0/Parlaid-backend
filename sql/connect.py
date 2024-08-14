@@ -1,10 +1,10 @@
 import psycopg2
-from config import load_config
+from sql.config import load_config
 
 def connect(config):
     """ Connect to the PostgreSQL database server """
     try:
-        # connecting to the PostgreSQL server
+        # connecting to the PostgreSQL server using the config dictionary
         with psycopg2.connect(**config) as conn:
             print('Connected to the PostgreSQL server.')
             return conn

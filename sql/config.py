@@ -1,35 +1,23 @@
-from configparser import ConfigParser
 import os
+from dotenv import load_dotenv
 
-def load_config(filename='database.ini', section='postgresql'):
-    # Get the absolute path of the configuration file
-    base_path = os.path.dirname(__file__)
-    abs_path = os.path.join(base_path, filename)
-    print(f"Looking for file at: {abs_path}")
+def load_config():
+    # Load environment variables from the .env.local file
+    dotenv_path = os.path.join(os.path.dirname(__file__), '../.env.local')
+    load_dotenv(dotenv_path=dotenv_path)
     
-    parser = ConfigParser()
-    if not os.path.exists(abs_path):
-        raise Exception(f"File not found: {abs_path}")
+    # Create a configuration dictionary from the environment variables
+    config = {
+        'host': os.getenv('DB_HOST'),
+        'database': os.getenv('DB_NAME'),
+        'user': os.getenv('DB_USER'),
+        'password': os.getenv('DB_PASSWORD')
+    }
 
-    # Read the file and print its contents for debugging
-    with open(abs_path, 'r') as file:
-        contents = file.read()
-        print("File contents:")
-        print(contents)
-
-    parser.read(abs_path)
-
-    # Debug print to see what sections are found
-    print(f"Sections found: {parser.sections()}")
-
-    config = {}
-    if parser.has_section(section):
-        params = parser.items(section)
-        for param in params:
-            config[param[0]] = param[1]
-    else:
-        raise Exception(f"Section {section} not found in the {abs_path} file")
-
+    # Check if any of the config values are None (meaning they weren't found in the .env.local)
+    if None in config.values():
+        raise Exception("One or more environment variables are missing.")
+    
     return config
 
 if __name__ == '__main__':
